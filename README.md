@@ -1,30 +1,18 @@
 MongoDB Project about a file explorer/searcher
 
-![A screenshot of a computer AI-generated content may be
-incorrect.](./public/image1.png){width="6.531944444444444in"
-height="5.142361111111111in"}
+(./public/image1.png)
 
-![A screenshot of a computer AI-generated content may be
-incorrect.](./public/image2.png){width="6.531944444444444in"
-height="3.2222222222222223in"}
+(./public/image2.png)
 
-![A screen shot of a computer AI-generated content may be
-incorrect.](./public/image3.png){width="6.531944444444444in"
-height="2.2840277777777778in"}![A screenshot of a computer AI-generated
-content may be
-incorrect.](./public/image4.png){width="6.531944444444444in"
-height="2.5229166666666667in"}![A screenshot of a computer AI-generated
-content may be
-incorrect.](./public/image5.png){width="6.531944444444444in"
-height="2.702777777777778in"}
+(./public/image3.png)
 
-![A screenshot of a computer AI-generated content may be
-incorrect.](./public/image6.png){width="6.531944444444444in"
-height="3.0in"}
+(./public/image4.png)
 
-![A screenshot of a computer AI-generated content may be
-incorrect.](./public/image7.png){width="6.531944444444444in"
-height="2.4027777777777777in"}
+(./public/image5.png)
+
+(./public/image6.png)
+
+(./public/image7.png)
 
 1.  files (one doc ≈ 300 B)
 
