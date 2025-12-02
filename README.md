@@ -1,19 +1,5 @@
 # MongoDB Project about a file explorer/searcher
 
-![File Schema](./public/image1.png)
-
-![Folder Schema](./public/image2.png)
-
-![Tags Schema](./public/image3.png)
-
-![File_tags Schema](./public/image4.png)
-
-![Text_chunks Schema](./public/image5.png)
-
-![AccessLogs Schema](./public/image6.png)
-
-![Trash Schema](./public/image7.png)
-
 ## 1.  files (one doc ≈ 300 B)
 
 ```
@@ -101,3 +87,19 @@
   autoPurgeAt: ISODate   // TTL index = today + 30 days
 }
 ```
+
+
+![File Schema](./public/image1.png)
+
+![Folder Schema](./public/image2.png)
+
+![Tags Schema](./public/image3.png)
+
+![File_tags Schema](./public/image4.png)
+
+![Text_chunks Schema](./public/image5.png)
+
+![AccessLogs Schema](./public/image6.png)
+
+![Trash Schema](./public/image7.png)
+
