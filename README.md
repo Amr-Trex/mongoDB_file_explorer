@@ -16,7 +16,7 @@
 
 ## 1.  files (one doc ≈ 300 B)
 
-```json
+```
 {
   _id        : ObjectId (Mongo gives this)
   uid        : string   # unique key = inode+mtime (or UUID)
@@ -40,7 +40,7 @@
 
 ## 2.  folders
 
-```json
+```
 {
   _id     : ObjectId
   name    : string        # "Documents"
@@ -53,7 +53,7 @@
 
 ## 3.  tags (user-defined labels)
 
-```json
+```
 {
   _id : ObjectId
   name: string  # "uni", "tax-2024", "holiday"
@@ -63,7 +63,7 @@
 
 ## 4.  file_tags (many-to-many join)
 
-```json
+```
 {
   fileId: ObjectId  # files._id
   tagId : ObjectId  # tags._id
@@ -72,7 +72,7 @@
 
 ## 5.  textChunks (for full-text search inside files)
 
-```json
+```
 {
   fileId : ObjectId
   chunkNo: int       # 0,1,2… (5000 chars each)
@@ -82,7 +82,7 @@
 
 ## 6.  accessLog (audit + recent-files + statistics)
 
-```json
+```
 {
   fileId   : ObjectId
   user     : string
@@ -94,7 +94,7 @@
 
 ## 7.  (optional) trash (soft-delete)
 
-```json
+```
 {
   fileId    : ObjectId
   deletedAt : ISODate
