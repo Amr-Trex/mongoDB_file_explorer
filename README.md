@@ -1,18 +1,18 @@
 MongoDB Project about a file explorer/searcher
 
-(./public/image1.png)
+![File Schema](./public/image1.png)
 
-(./public/image2.png)
+![Folder Schema](./public/image2.png)
 
-(./public/image3.png)
+![Tags Schema](./public/image3.png)
 
-(./public/image4.png)
+![File_tags Schema](./public/image4.png)
 
-(./public/image5.png)
+![Text_chunks Schema](./public/image5.png)
 
-(./public/image6.png)
+![AccessLogs Schema](./public/image6.png)
 
-(./public/image7.png)
+![Trash Schema](./public/image7.png)
 
 1.  files (one doc ≈ 300 B)
 
