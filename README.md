@@ -102,3 +102,7 @@
 ![AccessLogs Schema](./public/image6.png)
 
 ![Trash Schema](./public/image7.png)
+<<<<<<< HEAD
+=======
+
+>>>>>>> 042c1c82ea9fd2068df010d6fb2eeeb9749b78f5
