@@ -1,102 +1,104 @@
-MongoDB Project about a file explorer/searcher
+# MongoDB Project about a file explorer/searcher
 
-![A screenshot of a computer AI-generated content may be
-incorrect.](./public/image1.png){width="6.531944444444444in"
-height="5.142361111111111in"}
+## 1.  files (one doc ≈ 300 B)
 
-![A screenshot of a computer AI-generated content may be
-incorrect.](./public/image2.png){width="6.531944444444444in"
-height="3.2222222222222223in"}
-
-![A screen shot of a computer AI-generated content may be
-incorrect.](./public/image3.png){width="6.531944444444444in"
-height="2.2840277777777778in"}![A screenshot of a computer AI-generated
-content may be
-incorrect.](./public/image4.png){width="6.531944444444444in"
-height="2.5229166666666667in"}![A screenshot of a computer AI-generated
-content may be
-incorrect.](./public/image5.png){width="6.531944444444444in"
-height="2.702777777777778in"}
-
-![A screenshot of a computer AI-generated content may be
-incorrect.](./public/image6.png){width="6.531944444444444in"
-height="3.0in"}
-
-![A screenshot of a computer AI-generated content may be
-incorrect.](./public/image7.png){width="6.531944444444444in"
-height="2.4027777777777777in"}
-
-1.  files (one doc ≈ 300 B)
-
-{\
-\_id : ObjectId (Mongo gives **this**)\
-uid : **string** \# unique key = inode+mtime (or UUID)\
-name : **string** \# original name + extension\
-ext : **string** \# \".pdf\"\
-size : **long** \# bytes\
-path : **string** \# full absolute path on disk\
-folderId : ObjectId \# pointer to folders collection\
-owner : **string** \# \"me\" (multi-user prep)\
-dateAdded : ISODate \# when we first saw it\
-dateMod : ISODate \# file-system mtime\
-hash : **string** \# SHA-256 (dedupe, future integrity check)\
-mime : **string** \# \"application/pdf\" (optional)\
-meta : sub-document \# ext-specific goodies\
-pdf : { pages : **int**, author : **string**, title : **string** }\
-apk : { versionName : **string**, minSdk : **int**, iconGridFSId :
-ObjectId (thumb) }\
-img : { width : **int**, height : **int**, colorSpace : **string** }\
-lastOpen : ISODate \# updated by accessLog\
+```
+{
+  _id        : ObjectId (Mongo gives this)
+  uid        : string   # unique key = inode+mtime (or UUID)
+  name       : string   # original name + extension
+  ext        : string   # ".pdf"
+  size       : long     # bytes
+  path       : string   # full absolute path on disk
+  folderId   : ObjectId # pointer to folders collection
+  owner      : string   # "me" (multi-user prep)
+  dateAdded  : ISODate  # when we first saw it
+  dateMod    : ISODate  # file-system mtime
+  hash       : string   # SHA-256 (dedupe, future integrity check)
+  mime       : string   # "application/pdf" (optional)
+  meta       : sub-document  # ext-specific goodies
+     pdf : { pages : int, author : string, title  : string }
+     apk : { versionName : string, minSdk : int, iconGridFSId : ObjectId (thumb) }
+     img : { width : int, height : int, colorSpace : string }
+  lastOpen   : ISODate  # updated by accessLog
 }
+```
 
-2.  folders
+## 2.  folders
 
-{\
-\_id : ObjectId\
-name : string \# \"Documents\"\
-path : string \# \"/home/you/Documents\" (unique)\
-parentId: ObjectId\|null \# parent folder \_id (materialised path)\
-depth : int \# how deep from root (speed filter)\
-owner : string\
+```
+{
+  _id     : ObjectId
+  name    : string        # "Documents"
+  path    : string        # "/home/you/Documents"  (unique)
+  parentId: ObjectId|null # parent folder _id  (materialised path)
+  depth   : int           # how deep from root (speed filter)
+  owner   : string
 }
+```
 
-3.  tags (user-defined labels)
+## 3.  tags (user-defined labels)
 
-{\
-**\_id** : ObjectId\
-name: string \# \"uni\", \"tax-2024\", \"holiday\"\
-owner: string\
+```
+{
+  _id : ObjectId
+  name: string  # "uni", "tax-2024", "holiday"
+  owner: string
 }
+```
 
-4.  file_tags (many-to-many join)
+## 4.  file_tags (many-to-many join)
 
-{\
-**fileId**: ObjectId \# files.\_id\
-tagId : ObjectId \# tags.\_id\
+```
+{
+  fileId: ObjectId  # files._id
+  tagId : ObjectId  # tags._id
 }
+```
 
-5.  textChunks (for full-text search inside files)
+## 5.  textChunks (for full-text search inside files)
 
-{\
-fileId : ObjectId\
-chunkNo: int \# 0,1,2... (5000 chars each)\
-text : string \# actual text slice\
+```
+{
+  fileId : ObjectId
+  chunkNo: int       # 0,1,2… (5000 chars each)
+  text   : string    # actual text slice
 }
+```
 
-6.  accessLog (audit + recent-files + statistics)
+## 6.  accessLog (audit + recent-files + statistics)
 
-{\
-fileId : ObjectId\
-user : string\
-action : string \# OPEN, DOWNLOAD, DELETE, RENAME\
-timestamp: ISODate\
-ip : string \# optional when we add phone\
+```
+{
+  fileId   : ObjectId
+  user     : string
+  action   : string   # OPEN, DOWNLOAD, DELETE, RENAME
+  timestamp: ISODate
+  ip       : string   # optional when we add phone
 }
+```
 
-7.  (optional) trash (soft-delete)
+## 7.  (optional) trash (soft-delete)
 
-{\
-fileId : ObjectId\
-deletedAt : ISODate\
-autoPurgeAt: ISODate // TTL index = today + 30 days\
+```
+{
+  fileId    : ObjectId
+  deletedAt : ISODate
+  autoPurgeAt: ISODate   // TTL index = today + 30 days
 }
+```
+
+
+![File Schema](./public/image1.png)
+
+![Folder Schema](./public/image2.png)
+
+![Tags Schema](./public/image3.png)
+
+![File_tags Schema](./public/image4.png)
+
+![Text_chunks Schema](./public/image5.png)
+
+![AccessLogs Schema](./public/image6.png)
+
+![Trash Schema](./public/image7.png)
