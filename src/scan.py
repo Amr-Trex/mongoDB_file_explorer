@@ -3,7 +3,7 @@ import pathlib, os, datetime, hashlib, mimetypes
 
 client = MongoClient("mongodb://localhost:27017/")
 db = client.fileManager
-ROOT = pathlib.Path(input("Folder to index: ").strip() or pathlib.Path.home())
+# ROOT calculation moved to main block
 
 # -------------------- helpers --------------------
 def get_hash(path):
@@ -20,11 +20,14 @@ def get_hash(path):
         A hexadecimal string representing the SHA256 hash of
         the file at the given path.
     """
-    h = hashlib.sha256()
-    with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(1<<15), b''):
-            h.update(chunk)
-    return h.hexdigest()
+    try:
+        h = hashlib.sha256()
+        with open(path, 'rb') as f:
+            for chunk in iter(lambda: f.read(1<<15), b''):
+                h.update(chunk)
+        return h.hexdigest()
+    except (PermissionError, OSError):
+        return ""
 
 def ensure_indexes():
     db.files.create_index([("name", "text")])
@@ -33,6 +36,7 @@ def ensure_indexes():
     db.file_tags.create_index([("fileUid", 1), ("tagId", 1)], unique=True)
     db.accessLog.create_index([("timestamp", -1)])
     db.trash.create_index("autoPurgeAt", expireAfterSeconds=0)   # TTL
+
 
 # -------------------- 6-collection writer --------------------
 def scan(root: pathlib.Path, owner="me"):
@@ -103,4 +107,5 @@ def scan(root: pathlib.Path, owner="me"):
         print(c + ":", db[c].count_documents({}))
 
 if __name__ == "__main__":
+    ROOT = pathlib.Path(input("Folder to index: ").strip() or pathlib.Path.home())
     scan(ROOT)

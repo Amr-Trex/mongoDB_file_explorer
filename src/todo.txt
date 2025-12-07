@@ -1,0 +1,18 @@
+    TODO: 
+
+1. Add a scan field (path) and a scan button for the entire table to be scanned 
+2. When search is empty, show all files and folders in ordered and indented manner of folders
+3. Add a copy path button for each row
+4. Remove the extra unknown files/binary Files
+5. Add filter button for whether to include files and/or folders
+6. Add a sort button for each column
+7. Create listener to changes in files and update database and GUI
+8. Compile and done.
+
+
+    TODO: (DSA)
+
+    1. Implement AVL Tree for size index
+    2. Implement Hash Table for path to UID cache
+    3. Implement Graph + Dijkstra for folder shortest path
+    4. Implement Merge Sort / Quick Sort for client-side sorting

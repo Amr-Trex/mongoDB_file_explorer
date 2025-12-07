@@ -102,7 +102,35 @@
 ![AccessLogs Schema](./public/image6.png)
 
 ![Trash Schema](./public/image7.png)
-<<<<<<< HEAD
-=======
 
->>>>>>> 042c1c82ea9fd2068df010d6fb2eeeb9749b78f5
+
+### Possible Additions With Regards to DSA:
+
+1.  `AVL-tree` (or `Red-Black`) – SIZE INDEX
+    *   **Use-case**: “Top 100 biggest files”, “everything between 50 MB and 200 MB”
+    *   **Implementation**:
+        *   Key = file size (`uint64_t`), value = file UID
+        *   Insert / delete / update when Watchdog notices a change
+        *   In-order walk → already sorted, O(log n)
+        *   Python glue: `top_biggest(100)` returns UIDs in milliseconds without touching Mongo.
+
+2.  `Hash-Table` (`unordered_map`) – PATH → UID CACHE
+    *   **Use-case**: Watchdog gives us a full path; we need the UID immediately to update / delete
+    *   **Implementation**:
+        *   `unordered_map<string, string> pathToUid`
+        *   Updated on insert / rename / delete
+        *   O(1) lookup instead of a Mongo query every event
+
+3.  `Graph` + `Dijkstra` – FOLDER SHORTEST PATH
+    *   **Use-case**: “Move this file to Backup” – suggest shortest folder route
+    *   **Implementation**:
+        *   Nodes = folders, edges = parent-child, weight = 1
+        *   Build adjacency list once (scan phase)
+        *   Dijkstra gives shortest path; show user a button “Move along 3-folder route”
+
+4.  `Merge-Sort` / `Quick-Sort` – CLIENT-SIDE SORTING
+    *   **Use-case**: user clicks “Sort by size” or “Sort by date”
+    *   **Implementation**:
+        *   Pull UIDs + key from Mongo once, push into `vector<pair<Key, UID>>`
+        *   Your own `mergeSort()` or `quickSort()` → reorder vector
+        *   GUI refreshes rows – no extra DB hit
