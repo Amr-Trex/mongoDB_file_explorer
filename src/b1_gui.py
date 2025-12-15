@@ -30,8 +30,9 @@ toolbar.pack(fill="x", pady=2)
 detail_bar = ttk.Frame(root)
 detail_bar.pack(fill="x", pady=2)
 
-ttk.Button(toolbar, text=" ⚙  Settings").pack(side="right", padx=2)
+# ttk.Button(toolbar, text=" ⚙  Settings").pack(side="right", padx=2)
 
+# just some button styling
 style.configure("Tool.TButton", font=bold10, padding=1.5)
 style.map("Tool.TButton", background=[("active", "#e1e1e1")])
 

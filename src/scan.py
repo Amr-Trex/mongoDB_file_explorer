@@ -1,5 +1,6 @@
 from pymongo import MongoClient
 import pathlib, os, datetime, hashlib, mimetypes
+from db_commands import get_counts, ensure_indexes
 
 client = MongoClient("mongodb://localhost:27017/")
 db = client.fileManager
@@ -29,14 +30,6 @@ def get_hash(path):
     except (PermissionError, OSError):
         return ""
 
-def ensure_indexes():
-    db.files.create_index([("name", "text")])
-    db.folders.create_index([("path", 1)], unique=True)
-    db.tags.create_index([("name", 1)], unique=True)
-    db.file_tags.create_index([("fileUid", 1), ("tagId", 1)], unique=True)
-    db.accessLog.create_index([("timestamp", -1)])
-    db.trash.create_index("autoPurgeAt", expireAfterSeconds=0)   # TTL
-
 
 # -------------------- 6-collection writer --------------------
 def scan(root: pathlib.Path, owner="me"):
@@ -45,18 +38,27 @@ def scan(root: pathlib.Path, owner="me"):
     for folder, _, files in os.walk(root):
         folder_path = pathlib.Path(folder).resolve()
 
-        # 1. folders collection
-        fold_doc = {"path": str(folder_path), "name": folder_path.name, "owner": owner}
+        # ________________________1.1. folders collection
+        fold_doc = {
+            "path": str(folder_path), 
+            "name": folder_path.name, 
+            "owner": owner,
+            # date added... for the schema
+            "dateAdded": datetime.datetime.now(),
+        }
         db.folders.replace_one({"path": fold_doc["path"]}, fold_doc, upsert=True)
         folder_id = db.folders.find_one({"path": str(folder_path)})["_id"]
 
         for fname in files:
+            # the full path of the file
             full = folder_path / fname
             try:
                 stat = full.stat()
             except:
                 continue
+            # finding the user ID for the file
             uid = f"{stat.st_ino}_{int(stat.st_mtime)}"
+            # ________________________1.2. files collection ________________________
             file_doc = {
                 "uid": uid,
                 "name": fname,
@@ -72,7 +74,7 @@ def scan(root: pathlib.Path, owner="me"):
             }
             db.files.replace_one({"uid": uid}, file_doc, upsert=True)
 
-            # 2. textChunks (text files only)
+            # _____________________2. textChunks (text files only)
             # TODO: I should edit this so that it includes all text AND code file extensions...
             if file_doc["ext"] in {".txt", ".md", ".py", ".cpp", ".java", ".doc", ".docx"}:
                 try:
@@ -81,7 +83,7 @@ def scan(root: pathlib.Path, owner="me"):
                         {"fileId": uid, "chunkNo": 0},
                         {"fileId": uid, "chunkNo": 0, "text": txt}, upsert=True)
 
-                    # 3. auto-tag by extension  (example)
+                    # ________________________3. auto-tag by extension  (example)
                     tag_name = "text-file" if file_doc["ext"] in [".txt", ".md", ".doc", ".docx"] else f"code-file-{file_doc['ext'].lstrip('.')}"
                     if tag_name not in tag_cache:
                         db.tags.replace_one({"name": tag_name}, {"name": tag_name, "owner": owner}, upsert=True)
@@ -93,7 +95,7 @@ def scan(root: pathlib.Path, owner="me"):
                     # TODO: also over here... if it's a different file then decide tag_name
                     pass
 
-            # 4. accessLog  (fake "scanned" action for demo)
+            # ________________________4. accessLog  (fake "scanned" action for demo)
             db.accessLog.insert_one({
                 "fileId": uid,
                 "user": owner,
@@ -101,10 +103,9 @@ def scan(root: pathlib.Path, owner="me"):
                 "timestamp": datetime.datetime.now()
             })
 
+    # ________________________5. display final count report
     print("Scan complete.")
-    # 5. display stats and final count report
-    for c in ("files", "folders", "tags", "file_tags", "textChunks", "accessLog", "trash"):
-        print(c + ":", db[c].count_documents({}))
+    print(get_counts())
 
 if __name__ == "__main__":
     ROOT = pathlib.Path(input("Folder to index: ").strip() or pathlib.Path.home())
