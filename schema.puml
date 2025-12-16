@@ -1,0 +1,100 @@
+@startuml
+
+' Style configurations
+hide circle
+skinparam linetype ortho
+
+' 1. FILES COLLECTION [cite: 32, 40]
+entity "files" as files {
+  * _id : ObjectId <<PK>>
+  --
+  uid : string <<unique: inode+mtime/UUID>>
+  name : string
+  ext : string
+  size : long
+  path : string
+  folderId : ObjectId <<FK>>
+  owner : string
+  dateAdded : ISODate
+  dateMod : ISODate
+  hash : string <<SHA-256>>
+  mime : string
+  lastOpen : ISODate
+  --
+  ' Embedded sub-document structure 
+  meta : {
+    pdf: { pages, author, title },
+    apk: { versionName, minSdk, iconGridFSId },
+    img: { width, height, colorSpace }
+  }
+}
+
+' 2. FOLDERS COLLECTION [cite: 33, 40]
+entity "folders" as folders {
+  * _id : ObjectId <<PK>>
+  --
+  name : string
+  path : string <<unique>>
+  parentId : ObjectId <<FK, nullable>>
+  depth : int
+  owner : string
+}
+
+' 3. TAGS COLLECTION [cite: 35, 41]
+entity "tags" as tags {
+  * _id : ObjectId <<PK>>
+  --
+  name : string
+  owner : string
+}
+
+' 4. FILE_TAGS (Join Table) [cite: 35, 42]
+entity "file_tags" as file_tags {
+  * fileId : ObjectId <<FK>>
+  * tagId : ObjectId <<FK>>
+}
+
+' 5. TEXTCHUNKS (Full-text search) [cite: 36, 42]
+entity "textChunks" as textChunks {
+  * fileId : ObjectId <<FK>>
+  * chunkNo : int
+  --
+  text : string
+}
+
+' 6. ACCESSLOG (Audit) [cite: 38, 42]
+entity "accessLog" as accessLog {
+  * fileId : ObjectId <<FK>>
+  * timestamp : ISODate
+  --
+  user : string
+  action : string
+  ip : string
+}
+
+' 7. TRASH (Optional Soft-delete) [cite: 39, 42]
+entity "trash" as trash {
+  * fileId : ObjectId <<FK>>
+  --
+  deletedAt : ISODate
+  autoPurgeAt : ISODate <<TTL>>
+}
+
+' Relationships
+
+' Folder hierarchy (Recursive)
+folders |o..o{ folders : "parent of"
+
+' Folder contains Files
+folders ||..o{ files : "contains"
+
+' Many-to-Many via file_tags
+files ||..|{ file_tags : "has"
+tags ||..|{ file_tags : "categorizes"
+
+' Weak entity relationships
+files ||..|{ textChunks : "split into"
+files ||..|{ accessLog : "tracks"
+files ||..o| trash : "moves to"
+
+@enduml

@@ -142,9 +142,11 @@ def toggle_dark():
         style.map("Tool.TButton", background=[("active", "#d5d5d5")])
         
         style.configure("Treeview", background="white", foreground="black", fieldbackground="white")
+        style.configure("Treeview.Heading", background="#e1e1e1", foreground="black", relief="flat")
         style.map("Treeview", background=[("selected", "#0078d7")])
-        tree.tag_configure("odd", background="black") # This seems incorrect for light mode, assuming it was a placeholder.
-        tree.tag_configure("even", background="white")
+        style.map("Treeview.Heading", background=[("active", "#d2d2d2")])
+        tree.tag_configure("odd", background="white")
+        tree.tag_configure("even", background="#f9f9f9")
         
         is_dark_mode = False
     else:
@@ -165,7 +167,9 @@ def toggle_dark():
 
         # Configure Treeview specific styles for dark mode
         style.configure("Treeview", background="#2b2b2b", foreground="white", fieldbackground="#2b2b2b")
+        style.configure("Treeview.Heading", background="#3a3a3a", foreground="white", relief="flat")
         style.map("Treeview", background=[("selected", "#3e3e3e")])
+        style.map("Treeview.Heading", background=[("active", "#4a4a4a")])
         tree.tag_configure("odd", background="#3e3e3e")
         tree.tag_configure("even", background="#2b2b2b")
 
@@ -218,7 +222,10 @@ def search():
     if not kw:     # if the search bar is empty
         cursor = db.files.find().limit(200)
     else:
-        cursor = db.files.find({"$text": {"$search": kw}}).limit(200)
+        cursor = db.files.aggregate([
+            {"$match": {"$text": {"$search": kw}}},
+            {"$limit": 200}
+        ])
     
     for doc in cursor:
         folder = db.folders.find_one({"_id": doc["folderId"]}) or {}
