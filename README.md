@@ -1,136 +1,267 @@
 # MongoDB Project about a file explorer/searcher
 
-## 1.  files (one doc ≈ 300 B)
+## Core Collections (10 Total)
+
+### 1. files (Main User Files)
 
 ```
 {
-  _id        : ObjectId (Mongo gives this)
-  uid        : string   # unique key = inode+mtime (or UUID)
+  _id        : ObjectId
+  uid        : string   # inode+mtime
   name       : string   # original name + extension
   ext        : string   # ".pdf"
   size       : long     # bytes
-  path       : string   # full absolute path on disk
+  path       : string   # full absolute path
   folderId   : ObjectId # pointer to folders collection
-  owner      : string   # "me" (multi-user prep)
-  dateAdded  : ISODate  # when we first saw it
-  dateMod    : ISODate  # file-system mtime
-  hash       : string   # SHA-256 (dedupe, future integrity check)
-  mime       : string   # "application/pdf" (optional)
-  meta       : sub-document  # ext-specific goodies
-     pdf : { pages : int, author : string, title  : string }
-     apk : { versionName : string, minSdk : int, iconGridFSId : ObjectId (thumb) }
-     img : { width : int, height : int, colorSpace : string }
-  lastOpen   : ISODate  # updated by accessLog
+  owner      : string   # "me"
+  userId     : ObjectId # pointer to users collection
+  roles      : list     # e.g., ["read", "write"]
+  fileType   : string   # "UserFile"
+  deviceName : string   # e.g. "Amrtino (Windows11)"
+  dateAdded  : ISODate
+  dateMod    : ISODate
+  hash       : string   # SHA-256 for deduping
+  mime       : string
 }
 ```
 
-## 2.  folders
+### 2. folders (Main User Folders)
 
 ```
 {
-  _id     : ObjectId
-  name    : string        # "Documents"
-  path    : string        # "/home/you/Documents"  (unique)
-  parentId: ObjectId|null # parent folder _id  (materialised path)
-  depth   : int           # how deep from root (speed filter)
-  owner   : string
+  _id        : ObjectId
+  name       : string
+  path       : string
+  owner      : string
+  folderType : string   # "userFolder"
+  dateAdded  : ISODate
 }
 ```
 
-## 3.  tags (user-defined labels)
+### 3. systemFolders (OS & Application Caches)
 
 ```
 {
-  _id : ObjectId
-  name: string  # "uni", "tax-2024", "holiday"
+  _id        : ObjectId
+  name       : string
+  path       : string
+  owner      : string
+  folderType : string   # "sysFolder"
+  dateAdded  : ISODate
+}
+```
+
+### 4. systemArtifacts (OS Cache, `.git`, `.thumbnails`)
+
+```
+{
+  _id        : ObjectId
+  uid        : string
+  name       : string
+  ext        : string
+  size       : long
+  path       : string
+  folderId   : ObjectId
+  deviceName : string
+  osOrigin   : string   # "Windows", "Git", "MacOS"
+  fileType   : string   # "SystemFile"
+  dateMod    : ISODate
+}
+```
+
+### 5. users (RBAC metadata)
+
+```
+{
+  _id        : ObjectId
+  username   : string
+  domain     : string
+  dateAdded  : ISODate
+}
+```
+
+### 6. trash (Recycled Items)
+
+```
+{
+  _id         : ObjectId
+  uid         : string
+  name        : string
+  ext         : string
+  size        : long
+  path        : string
+  folderId    : ObjectId
+  deviceName  : string
+  fileType    : string   # "TrashFile"
+  dateDeleted : ISODate
+  autoPurgeAt : ISODate  # TTL index
+}
+```
+
+### 7. tags (User-defined tags)
+
+```
+{
+  _id  : ObjectId
+  name : string
   owner: string
 }
 ```
 
-## 4.  file_tags (many-to-many join)
+### 8. file_tags (Many-to-Many Join Table)
 
 ```
 {
-  fileId: ObjectId  # files._id
-  tagId : ObjectId  # tags._id
+  _id      : ObjectId
+  fileUid  : string
+  tagId    : ObjectId
 }
 ```
 
-## 5.  textChunks (for full-text search inside files)
+### 9. textChunks (Extracted Full Text Content)
 
 ```
 {
-  fileId : ObjectId
-  chunkNo: int       # 0,1,2… (5000 chars each)
-  text   : string    # actual text slice
+  _id      : ObjectId
+  fileId   : string
+  chunkNo  : int
+  text     : string
 }
 ```
 
-## 6.  accessLog (audit + recent-files + statistics)
+### 10. accessLog (Auditing Metrics)
 
 ```
 {
-  fileId   : ObjectId
-  user     : string
-  action   : string   # OPEN, DOWNLOAD, DELETE, RENAME
-  timestamp: ISODate
-  ip       : string   # optional when we add phone
+  _id        : ObjectId
+  fileId     : string
+  user       : string
+  action     : string   # SCANNED, OPEN, etc.
+  timestamp  : ISODate
 }
 ```
 
-## 7.  (optional) trash (soft-delete)
+---
 
+## Aggregation Pipelines Used
+
+MongoDB aggregations dynamically reshape data through pipelines. We abstracted our pipelines natively to improve GUI visualization capabilities:
+
+1. **`search_files`**: Employs `$match` coupled with a text index search (`$text`), merged dynamically against collection Discriminators (e.g., `fileType: UserFile`). It executes `$skip` and `$limit` for active memory pagination logic (Native Lazy Loading).
+
+```json
+[
+  {
+    "$match": { "$text": { "$search": "<search_kw>" }, "fileType": "UserFile" }
+  },
+  { "$skip": "<offset>" },
+  { "$limit": 100 }
+]
 ```
-{
-  fileId    : ObjectId
-  deletedAt : ISODate
-  autoPurgeAt: ISODate   // TTL index = today + 30 days
-}
+
+2. **`disk_usage_by_extension`**: Re-maps file storage footprints via `$group` matching on `$ext`. It aggregates (`$sum`) byte sizes together, then processes a descendant `$sort` to dynamically chart file types consuming the most disk space.
+
+```json
+[
+  {
+    "$group": {
+      "_id": "$ext",
+      "totalSize": { "$sum": "$size" },
+      "count": { "$sum": 1 }
+    }
+  },
+  { "$sort": { "totalSize": -1 } }
+]
 ```
 
+3. **`find_duplicates`**: Executes a grouping mechanism spanning `$hash` logic, retaining identical file roots using `$push: $$ROOT`. It relies on an active `$match` to prune results to groupings possessing a `count` > 1 to assist storage cleanup.
 
-![File Schema](./public/image1.png)
+```json
+[
+  {
+    "$group": {
+      "_id": "$hash",
+      "count": { "$sum": 1 },
+      "files": { "$push": "$$ROOT" }
+    }
+  },
+  {
+    "$match": {
+      "count": { "$gt": 1 },
+      "_id": { "$ne": "" },
+      "_id": { "$ne": null }
+    }
+  }
+]
+```
 
-![Folder Schema](./public/image2.png)
+4. **`user_access_metrics`**: A relational data query utilizing `$lookup` executing a Left Outer Join between `accessLog` and `users`. It matches usernames and outputs total system scan statistics per host.
 
-![Tags Schema](./public/image3.png)
+```json
+[
+  {
+    "$lookup": {
+      "from": "users",
+      "localField": "user",
+      "foreignField": "username",
+      "as": "userDetails"
+    }
+  },
+  {
+    "$group": {
+      "_id": "$user",
+      "scansCount": { "$sum": 1 },
+      "domain": { "$first": { "$arrayElemAt": ["$userDetails.domain", 0] } }
+    }
+  },
+  { "$sort": { "scansCount": -1 } }
+]
+```
 
-![File_tags Schema](./public/image4.png)
+---
 
-![Text_chunks Schema](./public/image5.png)
+## Database Indexing Configurations
 
-![AccessLogs Schema](./public/image6.png)
+Indexes bypass normal collection scans. Rather than forcing MongoDB to interpret arrays linearly (O(n)), B-Tree indexes yield O(log n) mapping. These are all the indexes created to optimize the database:
 
-![Trash Schema](./public/image7.png)
+- **`files` & `systemArtifacts : ("name", "text")`**: Required for our full-text searching functionality (`{"$text": {"$search"}}`) to operate rapidly across all stored paths in the GUI.
+- **`folders` & `systemFolders : ("path", 1)`**: Unique mappings (`unique=True`) guarantee scanner paths are entirely deduplicated seamlessly across disk evaluations.
+- **`tags : ("name", 1)`**: Unique mapping to prevent duplicate global tags from being generated.
+- **`file_tags : (("fileUid", 1), ("tagId", 1))`**: A unique compound index ensuring the many-to-many join table logic cleanly avoids duplicating tag associations.
+- **`accessLog : ("timestamp", -1)`**: Ensures retrieval of scan logs sorting from newest to oldest behaves optimally in the time-series.
+- **`trash : ("autoPurgeAt", TTL)`**: Deploys a Time-to-Live (`expireAfterSeconds=0`) automatic MongoDB cronjob ensuring items correctly dump after their lifecycle expires naturally without manual script sweeps.
+- **`users : ("username", 1)`**: Configured uniquely (`unique=True`) to prevent parallel user creation mapping errors and significantly optimize `$lookup` joins from the access log.
+- **`systemArtifacts : ("uid", 1)`**: Configured uniquely (`unique=True`) enforcing the constraint applied naturally by MongoDB's `ReplaceOne` logic, avoiding duplicated system cache item logs.
 
+---
 
 ### Possible Additions With Regards to DSA:
 
 1.  `AVL-tree` (or `Red-Black`) – SIZE INDEX
-    *   **Use-case**: “Top 100 biggest files”, “everything between 50 MB and 200 MB”
-    *   **Implementation**:
-        *   Key = file size (`uint64_t`), value = file UID
-        *   Insert / delete / update when Watchdog notices a change
-        *   In-order walk → already sorted, O(log n)
-        *   Python glue: `top_biggest(100)` returns UIDs in milliseconds without touching Mongo.
+    - **Use-case**: “Top 100 biggest files”, “everything between 50 MB and 200 MB”
+    - **Implementation**:
+      - Key = file size (`uint64_t`), value = file UID
+      - Insert / delete / update when Watchdog notices a change
+      - In-order walk → already sorted, O(log n)
+      - Python glue: `top_biggest(100)` returns UIDs in milliseconds without touching Mongo.
 
 2.  `Hash-Table` (`unordered_map`) – PATH → UID CACHE
-    *   **Use-case**: Watchdog gives us a full path; we need the UID immediately to update / delete
-    *   **Implementation**:
-        *   `unordered_map<string, string> pathToUid`
-        *   Updated on insert / rename / delete
-        *   O(1) lookup instead of a Mongo query every event
+    - **Use-case**: Watchdog gives us a full path; we need the UID immediately to update / delete
+    - **Implementation**:
+      - `unordered_map<string, string> pathToUid`
+      - Updated on insert / rename / delete
+      - O(1) lookup instead of a Mongo query every event
 
 3.  `Graph` + `Dijkstra` – FOLDER SHORTEST PATH
-    *   **Use-case**: “Move this file to Backup” – suggest shortest folder route
-    *   **Implementation**:
-        *   Nodes = folders, edges = parent-child, weight = 1
-        *   Build adjacency list once (scan phase)
-        *   Dijkstra gives shortest path; show user a button “Move along 3-folder route”
+    - **Use-case**: “Move this file to Backup” – suggest shortest folder route
+    - **Implementation**:
+      - Nodes = folders, edges = parent-child, weight = 1
+      - Build adjacency list once (scan phase)
+      - Dijkstra gives shortest path; show user a button “Move along 3-folder route”
 
 4.  `Merge-Sort` / `Quick-Sort` – CLIENT-SIDE SORTING
-    *   **Use-case**: user clicks “Sort by size” or “Sort by date”
-    *   **Implementation**:
-        *   Pull UIDs + key from Mongo once, push into `vector<pair<Key, UID>>`
-        *   Your own `mergeSort()` or `quickSort()` → reorder vector
-        *   GUI refreshes rows – no extra DB hit
+    - **Use-case**: user clicks “Sort by size” or “Sort by date”
+    - **Implementation**:
+      - Pull UIDs + key from Mongo once, push into `vector<pair<Key, UID>>`
+      - Your own `mergeSort()` or `quickSort()` → reorder vector
+      - GUI refreshes rows – no extra DB hit

@@ -16,7 +16,7 @@ db   = client.fileManager
 # ---------- window ----------
 root = tk.Tk()
 root.title("AmrTino's File Manager")
-root.geometry("700x400")
+root.geometry("800x500")
 style = ttk.Style()
 style.theme_use("clam")  
 
@@ -106,15 +106,71 @@ scan_all_btn.pack(side="left", padx=2)
 clear_btn = ttk.Button(toolbar, text="Clear DB 🗑", command=clearDB)
 clear_btn.pack(side="left", padx=2)
 
+show_system_var = tk.BooleanVar(value=False)
+sys_chk = ttk.Checkbutton(toolbar, text="Show System Files", variable=show_system_var, command=lambda: search())
+sys_chk.pack(side="left", padx=10)
 
+show_dupes_var = tk.BooleanVar(value=False)
+dupes_chk = ttk.Checkbutton(toolbar, text="Find Duplicates", variable=show_dupes_var, command=lambda: search())
+dupes_chk.pack(side="left", padx=5)
+
+def open_analytics():
+    top = tk.Toplevel(root)
+    top.title("Analytics Dashboard")
+    top.geometry("600x500")
+    
+    # Run pipelines
+    disk_usage = list(db.files.aggregate(db_commands.get_aggregate("disk_usage_by_extension")))
+    user_metrics = list(db.accessLog.aggregate(db_commands.get_aggregate("user_access_metrics")))
+    
+    ttk.Label(top, text="Disk Usage by Extension", font=bold12).pack(pady=10)
+    
+    # Table 1
+    cols1 = ("Extension", "Total Size (Bytes)", "File Count")
+    tree1 = ttk.Treeview(top, columns=cols1, show="headings", height=8)
+    for c in cols1: tree1.heading(c, text=c)
+    tree1.pack(fill="x", padx=10)
+    
+    for row in disk_usage:
+        ext_val = row.get("_id") or "Unknown"
+        size_val = f"{row.get('totalSize', 0):,.0f}"
+        count_val = row.get("count", 0)
+        tree1.insert("", "end", values=(ext_val, size_val, count_val))
+        
+    ttk.Label(top, text="User Access Metrics", font=bold12).pack(pady=10)
+    
+    # Table 2
+    cols2 = ("User", "Domain", "Total Scans")
+    tree2 = ttk.Treeview(top, columns=cols2, show="headings", height=8)
+    for c in cols2: tree2.heading(c, text=c)
+    tree2.pack(fill="x", padx=10)
+    
+    for row in user_metrics:
+        user_val = row.get("_id") or "Unknown"
+        domain_val = row.get("domain", "Unknown")
+        scans_val = row.get("scansCount", 0)
+        tree2.insert("", "end", values=(user_val, domain_val, scans_val))
+
+analytics_btn = ttk.Button(toolbar, text="Analytics 📈", command=open_analytics)
+analytics_btn.pack(side="right", padx=10)
 
 # ---------- result grid ----------
+tree_frame = ttk.Frame(root)
+tree_frame.pack(fill="both", expand=True, padx=4, pady=4)
+
 cols = ("name", "ext", "size", "folder", "modified")
-tree = ttk.Treeview(root, columns=cols, show="headings")
+tree = ttk.Treeview(tree_frame, columns=cols, show="headings")
+
+scrollbar = ttk.Scrollbar(tree_frame, orient="vertical")
+tree.configure(yscrollcommand=scrollbar.set)
+
+scrollbar.pack(side="right", fill="y")
+tree.pack(side="left", fill="both", expand=True)
+
 for c in cols:
     tree.heading(c, text=c.title())
     tree.column(c, width=120 if c != "name" else 200)
-tree.pack(fill="both", expand=True)
+
 tree.tag_configure("odd", background="black")
 tree.tag_configure("even", background="white")
 tree.tag_configure("selected", background="#0078d7", foreground="white")
@@ -215,28 +271,69 @@ def on_open(event):
         messagebox.showerror("Open", f"Could not open:\n{e}")
 
 
-def search():
-    # TODO: fix search
+current_offset = 0
+
+def load_more_data():
+    global current_offset
     kw = ent.get().strip()
-    tree.delete(*tree.get_children())
-    if not kw:     # if the search bar is empty
-        cursor = db.files.find().limit(200)
-    else:
-        cursor = db.files.aggregate([
-            {"$match": {"$text": {"$search": kw}}},
-            {"$limit": 200}
-        ])
+    limit = 100
     
-    for doc in cursor:
-        folder = db.folders.find_one({"_id": doc["folderId"]}) or {}
+    # if show_system_var is true, show system files, else show user files
+    collection = db.systemArtifacts if show_system_var.get() else db.files
+    filter_doc = {"fileType": "SystemFile"} if show_system_var.get() else {"fileType": "UserFile"}
+        
+    if show_dupes_var.get():
+        cursor = collection.aggregate(db_commands.get_aggregate("find_duplicates"))
+    elif not kw:
+        cursor = collection.find(filter_doc).skip(current_offset).limit(limit)
+    else:
+        # imported the pipeline from db_commands.py
+        pipeline = db_commands.get_aggregate(
+            "search_files",
+            search_kw=kw,
+            filter_doc=filter_doc,
+            offset=current_offset,
+            limit=limit
+        )
+        cursor = collection.aggregate(pipeline)
+        
+    count = 0
+    for result in cursor:
+        doc = result.get("files", [result])[0] if show_dupes_var.get() else result
+        
+        count += 1
+        folder = db.folders.find_one({"_id": doc.get("folderId")}) or db.systemFolders.find_one({"_id": doc.get("folderId")}) or {}
+        date_mod = doc.get("dateMod")
+        date_str = date_mod.strftime("%Y-%m-%d") if date_mod else ""
+        
         tree.insert("", "end", values=(
-            doc["name"],
-            doc["ext"],
-            f'{doc["size"]:,.0f}',
+            doc.get("name", ""),
+            doc.get("ext", ""),
+            f'{doc.get("size", 0):,.0f}',
             folder.get("name", ""),
-            doc["dateMod"].strftime("%Y-%m-%d"),
-            # doc["path"] 
+            date_str
         ))
+    
+    current_offset += count
+
+def search():
+    global current_offset
+    current_offset = 0
+    tree.delete(*tree.get_children())
+    load_more_data()
+
+
+# scroll and mousewheel event handlers created by AI:
+def on_scroll(*args):
+    tree.yview(*args)
+    if tree.yview()[1] >= 0.95:
+        load_more_data()
+
+scrollbar.config(command=on_scroll)
+def on_mousewheel(event):
+    if tree.yview()[1] >= 0.95 and event.delta < 0:
+        load_more_data()
+tree.bind("<MouseWheel>", on_mousewheel)
 
 
 tree.bind("<Double-1>", on_open)
